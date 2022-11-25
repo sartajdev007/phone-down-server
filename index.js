@@ -29,6 +29,38 @@ async function run() {
             res.status(403).send('Forbidden Access')
         })
 
+        app.get('/users', async (req, res) => {
+            const query = {};
+            const users = await usersCollection.find(query).toArray();
+            res.send(users)
+        })
+
+
+        app.get('/users/allbuyers', async (req, res) => {
+            const query = { role: 'buyer' };
+            const buyers = await usersCollection.find(query).toArray();
+            res.send(buyers)
+        })
+
+        app.put('/users/allbuyers/admin/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
+            const updatedUser = {
+                $set: {
+                    status: 'admin'
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedUser, options)
+        })
+
+
+        app.get('/users/allsellers', async (req, res) => {
+            const query = { role: 'seller' };
+            const sellers = await usersCollection.find(query).toArray();
+            res.send(sellers)
+        })
+
         app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await usersCollection.insertOne(user);
@@ -50,6 +82,6 @@ app.get('/', (req, res) => {
 })
 
 app.listen(port, () => {
-    console.log(`Doctors portal running on ${port}`)
+    console.log(`Phone down running on ${port}`)
 })
 
