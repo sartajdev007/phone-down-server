@@ -33,6 +33,8 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 async function run() {
     try {
         const usersCollection = client.db('phoneDown').collection('users')
+        const categoriesCollection = client.db('phoneDown').collection('categories')
+        const productsCollection = client.db('phoneDown').collection('products')
 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
@@ -45,10 +47,30 @@ async function run() {
             res.status(403).send('Forbidden Access')
         })
 
+        app.get('/categories', async (req, res) => {
+            const query = {};
+            const categories = await categoriesCollection.find(query).toArray()
+            res.send(categories)
+        })
+
+        app.get('/categories/:id', async (req, res) => {
+            const id = req.params.id
+            const query = { _id: ObjectId(id) }
+            const category = await categoriesCollection.findOne(query)
+            res.send(category)
+        })
+
         app.get('/users', async (req, res) => {
             const query = {};
             const users = await usersCollection.find(query).toArray();
             res.send(users)
+        })
+
+        app.get('/users/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email }
+            const user = await usersCollection.findOne(query)
+            res.send({ isAdmin: user?.status === 'admin' })
         })
 
         app.post('/users', async (req, res) => {
@@ -85,17 +107,6 @@ async function run() {
             res.send(buyers)
         })
 
-        // app.put('/users/allbuyers/admin/:id', async (req, res) => {
-        //     const id = req.params.id;
-        //     const filter = { _id: ObjectId(id) };
-        //     const options = { upsert: true };
-        //     const updatedUser = {
-        //         $set: {
-        //             status: 'admin'
-        //         }
-        //     }
-        //     const result = await usersCollection.updateOne(filter, updatedUser, options)
-        // })
 
         // sellers api
         app.get('/users/allsellers', async (req, res) => {
@@ -103,6 +114,58 @@ async function run() {
             const sellers = await usersCollection.find(query).toArray();
             res.send(sellers)
         })
+
+        app.get('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email }
+            const user = await usersCollection.findOne(query)
+            res.send({ isSeller: user?.role === 'seller' })
+        })
+
+        // products api
+
+        app.get('/products', async (req, res) => {
+            const query = {}
+            const products = await productsCollection.find(query).toArray()
+            res.send(products)
+        })
+
+
+        app.put('/myproducts/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) }
+            const options = { upsert: true };
+            const updatedAdvertised = {
+                $set: {
+                    advertised: true
+                }
+            }
+            const result = await productsCollection.updateOne(filter, updatedAdvertised, options)
+            res.send(result)
+
+        })
+
+
+        app.get('/myproducts', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+
+            if (email !== decodedEmail) {
+                return res.status(403).send({ message: 'Forbidden Access' });
+            }
+
+            const query = { email: email };
+            const products = await productsCollection.find(query).toArray()
+            res.send(products)
+        })
+
+
+        app.post('/products', async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
+            res.send(result)
+        })
+
 
     }
     finally {
