@@ -107,8 +107,36 @@ async function run() {
             res.send(buyers)
         })
 
+        app.get('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email }
+            const user = await usersCollection.findOne(query)
+            res.send({ isBuyer: user?.role === 'buyer' })
+        })
+
+
 
         // sellers api
+        app.put('/users/allsellers/:id', verifyJWT, async (req, res) => {
+            const decodedEmail = req.decoded.email;
+            const query = { email: decodedEmail }
+            const user = await usersCollection.findOne(query)
+            if (user.status !== 'admin') {
+                return res.status(403).send('Forbidden Access')
+            }
+            const id = req.params.id;
+            const filter = { _id: ObjectId(id) };
+            const options = { upsert: true };
+            const updatedUser = {
+                $set: {
+                    verified: true
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updatedUser, options)
+            res.send(result)
+        })
+
+
         app.get('/users/allsellers', async (req, res) => {
             const query = { role: 'seller' };
             const sellers = await usersCollection.find(query).toArray();
@@ -134,7 +162,7 @@ async function run() {
         app.put('/myproducts/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: ObjectId(id) }
-            const options = { upsert: true };
+            const options = { upsert: false };
             const updatedAdvertised = {
                 $set: {
                     advertised: true
@@ -142,8 +170,11 @@ async function run() {
             }
             const result = await productsCollection.updateOne(filter, updatedAdvertised, options)
             res.send(result)
-
         })
+
+        // app.put('/:id', async (req, res) => {
+        //     try {
+        //         await ListItem.findByIdAndUpdate(req.params.id, { itemname: req.body.itemname, category: req.body.category }); // Send response in here res.send('Item Updated!'); } catch(err) { console.error(err.message); res.send(400).send('Server Error'); } });
 
 
         app.get('/myproducts', verifyJWT, async (req, res) => {
@@ -165,7 +196,6 @@ async function run() {
             const result = await productsCollection.insertOne(product);
             res.send(result)
         })
-
 
     }
     finally {
