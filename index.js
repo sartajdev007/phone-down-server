@@ -35,6 +35,7 @@ async function run() {
         const usersCollection = client.db('phoneDown').collection('users')
         const categoriesCollection = client.db('phoneDown').collection('categories')
         const productsCollection = client.db('phoneDown').collection('products')
+        const bookingsCollection = client.db('phoneDown').collection('bookings')
 
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
@@ -59,6 +60,42 @@ async function run() {
             const category = await categoriesCollection.findOne(query)
             res.send(category)
         })
+
+
+        app.get('/myorders', verifyJWT, async (req, res) => {
+            const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ message: 'Forbidden Access' });
+            }
+            const query = { buyerEmail: email };
+            const bookings = await bookingsCollection.find(query).toArray()
+            res.send(bookings)
+        })
+
+
+        app.put('/bookings/:id', async (req, res) => {
+            const id = req.params.id
+            const filter = ({ _id: ObjectId(id) })
+            const product = req.body
+            console.log(product)
+            const options = { upsert: false }
+            let updateProduct = {
+                $set: {
+                    status: 1
+                }
+            }
+            const result = await productsCollection.updateOne(filter, updateProduct, options)
+            res.send(result)
+        })
+
+        app.post('/bookings', async (req, res) => {
+            const booking = req.body;
+            const result = await bookingsCollection.insertOne(booking)
+            res.send(result)
+        })
+
+
 
         app.get('/users', async (req, res) => {
             const query = {};
@@ -106,17 +143,22 @@ async function run() {
             const buyers = await usersCollection.find(query).toArray();
             res.send(buyers)
         })
+        app.get('/users/allsellers', async (req, res) => {
+            const query = { role: 'seller' };
+            const sellers = await usersCollection.find(query).toArray();
+            res.send(sellers)
+        })
 
         app.get('/users/:email', async (req, res) => {
             const email = req.params.email;
             const query = { email }
             const user = await usersCollection.findOne(query)
-            res.send({ isBuyer: user?.role === 'buyer' })
+            res.send(user.role === 'seller' ? { isSeller: true, isBuyer: false } : user.role === 'buyer' ? { isBuyer: true, isSeller: false } : '')
         })
 
 
-
         // sellers api
+
         app.put('/users/allsellers/:id', verifyJWT, async (req, res) => {
             const decodedEmail = req.decoded.email;
             const query = { email: decodedEmail }
@@ -136,27 +178,49 @@ async function run() {
             res.send(result)
         })
 
-
-        app.get('/users/allsellers', async (req, res) => {
-            const query = { role: 'seller' };
-            const sellers = await usersCollection.find(query).toArray();
-            res.send(sellers)
+        app.delete('/users/allsellers/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const result = await usersCollection.deleteOne(filter)
+            res.send(result)
         })
 
-        app.get('/users/:email', async (req, res) => {
-            const email = req.params.email;
-            const query = { email }
-            const user = await usersCollection.findOne(query)
-            res.send({ isSeller: user?.role === 'seller' })
-        })
 
         // products api
+
 
         app.get('/products', async (req, res) => {
             const query = {}
             const products = await productsCollection.find(query).toArray()
             res.send(products)
         })
+
+
+        // app.put('/products', async (req, res) => {
+        //     const email = req.query.email
+        //     const query = { email: email }
+        //     const user = await usersCollection.findOne(query)
+        //     if (user.verified) {
+        //         const id = req.params.id
+        //         const filter = { _id: ObjectId(id) }
+        //         const options = { upsert: true }
+        //         const updatedProducts = {
+        //             $set: {
+        //                 verifiedSeller: true
+        //             }
+        //         }
+        //         const products = await productsCollection.updateMany(filter, updatedProducts, options)
+        //         res.send(products)
+        //     }
+        // })
+
+        app.get('/products', async (req, res) => {
+            const email = req.query.email
+            const query = { email: email }
+            const products = await productsCollection.find(query).toArray()
+            res.send(products)
+        })
+
 
 
         app.put('/myproducts/:id', async (req, res) => {
@@ -171,11 +235,6 @@ async function run() {
             const result = await productsCollection.updateOne(filter, updatedAdvertised, options)
             res.send(result)
         })
-
-        // app.put('/:id', async (req, res) => {
-        //     try {
-        //         await ListItem.findByIdAndUpdate(req.params.id, { itemname: req.body.itemname, category: req.body.category }); // Send response in here res.send('Item Updated!'); } catch(err) { console.error(err.message); res.send(400).send('Server Error'); } });
-
 
         app.get('/myproducts', verifyJWT, async (req, res) => {
             const email = req.query.email;
