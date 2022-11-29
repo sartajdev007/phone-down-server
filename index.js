@@ -37,6 +37,20 @@ async function run() {
         const productsCollection = client.db('phoneDown').collection('products')
         const bookingsCollection = client.db('phoneDown').collection('bookings')
 
+
+        const verifyAdmin = async (req, res, next) => {
+            console.log(req.decoded.email)
+            const decodedEmail = req.decoded.email
+            const query = { email: decodedEmail }
+            const user = await usersCollection.findOne(query)
+            if (user?.status !== 'admin') {
+                return res.status(403).send({ message: 'forbidden' })
+            }
+            next()
+        }
+
+
+
         app.get('/jwt', async (req, res) => {
             const email = req.query.email;
             const query = { email: email }
@@ -77,12 +91,11 @@ async function run() {
         app.put('/bookings/:id', async (req, res) => {
             const id = req.params.id
             const filter = ({ _id: ObjectId(id) })
-            const product = req.body
-            console.log(product)
             const options = { upsert: false }
-            let updateProduct = {
+            const updateProduct = {
                 $set: {
-                    status: 1
+                    status: 1,
+                    advertised: false
                 }
             }
             const result = await productsCollection.updateOne(filter, updateProduct, options)
@@ -95,6 +108,30 @@ async function run() {
             res.send(result)
         })
 
+        app.put('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const filter = ({ email: email })
+            const options = { upsert: true }
+            const updateUser = {
+                $set: {
+                    role: 'buyer'
+                }
+            }
+            const result = await usersCollection.updateOne(filter, updateUser, options)
+            res.send(result)
+        })
+
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            const query = { email: user.email }
+            const previousUser = await usersCollection.find(query).toArray()
+            if (previousUser.length) {
+                const message = `user already registered`
+                return res.send({ acknowledged: false, message })
+            }
+            const result = await usersCollection.insertOne(user);
+            res.send(result)
+        })
 
 
         app.get('/users', async (req, res) => {
@@ -110,11 +147,6 @@ async function run() {
             res.send({ isAdmin: user?.status === 'admin' })
         })
 
-        app.post('/users', async (req, res) => {
-            const user = req.body;
-            const result = await usersCollection.insertOne(user);
-            res.send(result)
-        })
 
         app.put('/users/admin/:id', verifyJWT, async (req, res) => {
             const decodedEmail = req.decoded.email;
@@ -159,7 +191,7 @@ async function run() {
 
         // sellers api
 
-        app.put('/users/allsellers/:id', verifyJWT, async (req, res) => {
+        app.put('/users/allsellers/:id', verifyJWT, verifyAdmin, async (req, res) => {
             const decodedEmail = req.decoded.email;
             const query = { email: decodedEmail }
             const user = await usersCollection.findOne(query)
@@ -195,24 +227,31 @@ async function run() {
             res.send(products)
         })
 
+        app.put('/products/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const options = { upsert: true }
+            const reportUpdate = {
+                $set: {
+                    reported: true
+                }
+            }
+            const result = await productsCollection.updateOne(filter, reportUpdate, options)
+            res.send(result)
+        })
 
-        // app.put('/products', async (req, res) => {
-        //     const email = req.query.email
-        //     const query = { email: email }
-        //     const user = await usersCollection.findOne(query)
-        //     if (user.verified) {
-        //         const id = req.params.id
-        //         const filter = { _id: ObjectId(id) }
-        //         const options = { upsert: true }
-        //         const updatedProducts = {
-        //             $set: {
-        //                 verifiedSeller: true
-        //             }
-        //         }
-        //         const products = await productsCollection.updateMany(filter, updatedProducts, options)
-        //         res.send(products)
-        //     }
-        // })
+        app.put('/products', verifyJWT, verifyAdmin, async (req, res) => {
+            const email = req.query.email
+            const query = { email: email }
+            const options = { upsert: false }
+            const updateVerify = {
+                $set: {
+                    verifiedSeller: true
+                }
+            }
+            const result = await productsCollection.updateMany(query, updateVerify, options)
+            res.send(result)
+        })
 
         app.get('/products', async (req, res) => {
             const email = req.query.email
@@ -253,6 +292,13 @@ async function run() {
         app.post('/products', async (req, res) => {
             const product = req.body;
             const result = await productsCollection.insertOne(product);
+            res.send(result)
+        })
+
+        app.delete('/myproducts/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id
+            const filter = { _id: ObjectId(id) }
+            const result = await productsCollection.deleteOne(filter)
             res.send(result)
         })
 
