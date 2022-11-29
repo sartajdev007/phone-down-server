@@ -2,6 +2,7 @@ const express = require('express')
 const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const jwt = require('jsonwebtoken')
 const app = express()
 
@@ -50,18 +51,6 @@ async function run() {
         }
 
 
-
-        app.get('/jwt', async (req, res) => {
-            const email = req.query.email;
-            const query = { email: email }
-            const user = await usersCollection.findOne(query)
-            if (user) {
-                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '2h' })
-                return res.send({ accessToken: token })
-            }
-            res.status(403).send('Forbidden Access')
-        })
-
         app.get('/categories', async (req, res) => {
             const query = {};
             const categories = await categoriesCollection.find(query).toArray()
@@ -87,6 +76,13 @@ async function run() {
             res.send(bookings)
         })
 
+        app.get('/bookings/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) }
+            const booking = await bookingsCollection.findOne(query)
+            res.send(booking)
+        })
+
 
         app.put('/bookings/:id', async (req, res) => {
             const id = req.params.id
@@ -102,10 +98,41 @@ async function run() {
             res.send(result)
         })
 
+
         app.post('/bookings', async (req, res) => {
             const booking = req.body;
             const result = await bookingsCollection.insertOne(booking)
             res.send(result)
+        })
+
+        app.post('/create-payment-intent', async (req, res) => {
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            })
+        })
+
+
+        app.get('/jwt', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email }
+            const user = await usersCollection.findOne(query)
+            if (user) {
+                const token = jwt.sign({ email }, process.env.ACCESS_TOKEN, { expiresIn: '2h' })
+                return res.send({ accessToken: token })
+            }
+            res.status(403).send('Forbidden Access')
         })
 
         app.put('/users/:email', async (req, res) => {
