@@ -6,6 +6,7 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const jwt = require('jsonwebtoken')
 const app = express()
 
+
 const port = process.env.PORT || 5000
 // middlewares
 app.use(cors())
@@ -37,6 +38,7 @@ async function run() {
         const categoriesCollection = client.db('phoneDown').collection('categories')
         const productsCollection = client.db('phoneDown').collection('products')
         const bookingsCollection = client.db('phoneDown').collection('bookings')
+        const paymentsCollection = client.db('phoneDown').collection('payments')
 
 
         const verifyAdmin = async (req, res, next) => {
@@ -121,6 +123,21 @@ async function run() {
             res.send({
                 clientSecret: paymentIntent.client_secret,
             })
+        })
+
+        app.post('/payments', async (req, res) => {
+            const payment = req.body
+            const result = await paymentsCollection.insertOne(payment)
+            const id = payment.bookingId
+            const filter = { _id: ObjectId(id) }
+            const updatedDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const updatedResult = await bookingsCollection.updateOne(filter, updatedDoc)
+            res.send(result)
         })
 
 
