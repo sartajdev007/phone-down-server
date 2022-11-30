@@ -41,16 +41,6 @@ async function run() {
         const paymentsCollection = client.db('phoneDown').collection('payments')
 
 
-        const verifyAdmin = async (req, res, next) => {
-            console.log(req.decoded.email)
-            const decodedEmail = req.decoded.email
-            const query = { email: decodedEmail }
-            const user = await usersCollection.findOne(query)
-            if (user?.status !== 'admin') {
-                return res.status(403).send({ message: 'forbidden' })
-            }
-            next()
-        }
 
 
         app.get('/categories', async (req, res) => {
@@ -235,7 +225,7 @@ async function run() {
 
         // sellers api
 
-        app.put('/users/allsellers/:id', verifyJWT, verifyAdmin, async (req, res) => {
+        app.put('/users/allsellers/:id', verifyJWT, async (req, res) => {
             const decodedEmail = req.decoded.email;
             const query = { email: decodedEmail }
             const user = await usersCollection.findOne(query)
@@ -284,7 +274,7 @@ async function run() {
             res.send(result)
         })
 
-        app.put('/products', verifyJWT, verifyAdmin, async (req, res) => {
+        app.put('/products', verifyJWT, async (req, res) => {
             const email = req.query.email
             const query = { email: email }
             const options = { upsert: false }
